@@ -5,6 +5,7 @@
 
 #include <stdbool.h>
 
+#define MAX_LINE 1024
 #define MAX_ARGS 256
 
 // Command structure to hold parsed data

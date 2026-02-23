@@ -4,17 +4,8 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define MAX_ARGS 256
+#include "../include/parser.h"      // Make sure this is included
 
-// Command structure to hold parsed data
-typedef struct {
-    char *command;        // Primary command (e.g., "ls")
-    char *args[MAX_ARGS]; // Arguments array (e.g., ["-la"])
-    char *input_file;     // Input file for redirection (<)
-    char *output_file;    // Output file for redirection (>)
-    bool append;          // Flag for append mode (>>)
-    bool background;      // Flag for background process (&)
-} Command;
 
 // Function to trim newline from input
 void trim_newline(char *line) {
