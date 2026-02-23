@@ -29,7 +29,7 @@ The shell is written in POSIX-compliant C and follows modular design principles 
 ## Compilation Instructions
 
 ```bash
-gcc src/main.c src/parser.c -Iinclude -o mysh
+gcc -Wall -Wextra -std=c11 -Iinclude src/main.c src/parser.c src/interpreter.c -o mysh
 ```
 
 ---
@@ -182,4 +182,3 @@ mysh > exit
 ---
 
 # End of README
-
