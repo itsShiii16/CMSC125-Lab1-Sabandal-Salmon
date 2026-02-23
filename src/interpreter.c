@@ -1,3 +1,4 @@
+// interpreter.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,35 +6,120 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <errno.h>
 
-#include "../include/interpreter.h"      // Make sure this is included
+#include "../include/interpreter.h"
 
+// ----------------------
+// Background job tracking
+// ----------------------
+#define MAX_BG_JOBS 64
+
+typedef struct {
+    int job_id;
+    pid_t pid;
+    char name[128];
+} BgJob;
+
+static BgJob bg_jobs[MAX_BG_JOBS];
+static int bg_count = 0;
+static int next_job_id = 1;
+
+static void add_bg_job(pid_t pid, const char *name) {
+    if (bg_count >= MAX_BG_JOBS) {
+        fprintf(stderr, "warning: too many background jobs; not tracking pid %d\n", pid);
+        return;
+    }
+    bg_jobs[bg_count].job_id = next_job_id++;
+    bg_jobs[bg_count].pid = pid;
+
+    // copy command name safely (at least cmd.command)
+    if (name == NULL) name = "(unknown)";
+    strncpy(bg_jobs[bg_count].name, name, sizeof(bg_jobs[bg_count].name) - 1);
+    bg_jobs[bg_count].name[sizeof(bg_jobs[bg_count].name) - 1] = '\0';
+
+    printf("[%d] Started background job: %s (PID: %d)\n",
+           bg_jobs[bg_count].job_id, bg_jobs[bg_count].name, bg_jobs[bg_count].pid);
+
+    bg_count++;
+}
+
+static void remove_bg_job_by_pid(pid_t pid) {
+    for (int i = 0; i < bg_count; i++) {
+        if (bg_jobs[i].pid == pid) {
+            bg_jobs[i] = bg_jobs[bg_count - 1];
+            bg_count--;
+            return;
+        }
+    }
+}
+
+// Call this regularly (e.g., every loop) to avoid zombies.
+void reap_background_jobs(void) {
+    int status;
+    pid_t done;
+
+    // Reap any finished child without blocking
+    while ((done = waitpid(-1, &status, WNOHANG)) > 0) {
+        // Print a "done" message if it was tracked as a bg job
+        for (int i = 0; i < bg_count; i++) {
+            if (bg_jobs[i].pid == done) {
+                if (WIFEXITED(status)) {
+                    printf("[%d] Done: %s (PID: %d) exit=%d\n",
+                           bg_jobs[i].job_id, bg_jobs[i].name, (int)done, WEXITSTATUS(status));
+                } else if (WIFSIGNALED(status)) {
+                    printf("[%d] Done: %s (PID: %d) signal=%d\n",
+                           bg_jobs[i].job_id, bg_jobs[i].name, (int)done, WTERMSIG(status));
+                } else {
+                    printf("[%d] Done: %s (PID: %d)\n",
+                           bg_jobs[i].job_id, bg_jobs[i].name, (int)done);
+                }
+
+                remove_bg_job_by_pid(done);
+                break;
+            }
+        }
+    }
+
+    // If done == 0: nothing finished (normal)
+    // If done < 0: could be "no children" or real error
+    if (done < 0 && errno != ECHILD) {
+        perror("waitpid(WNOHANG) failed");
+    }
+}
+
+// ----------------------
+// Built-ins
+// ----------------------
 int handle_builtin(Command cmd) {
-    // for exit
+    if (cmd.command == NULL) return 1; // nothing to do
+
+    // exit
     if (strcmp(cmd.command, "exit") == 0) {
         printf("Exiting shell...\n");
         exit(0);
     }
 
-    // for cd
+    // cd
     if (strcmp(cmd.command, "cd") == 0) {
-        if (cmd.args[0] == NULL) {                                          // If no directory provided, go to HOME
+        if (cmd.args[0] == NULL) {
             char *home = getenv("HOME");
             if (home == NULL) {
                 fprintf(stderr, "cd: HOME not set\n");
                 return 1;
             }
-            chdir(home);
-        }
-        else {
+            if (chdir(home) != 0) {
+                perror("cd failed");
+            }
+        } else {
             if (chdir(cmd.args[0]) != 0) {
                 perror("cd failed");
             }
         }
-        return 1;                                                           // handled
+        return 1;
     }
 
-    // for pwd
+    // pwd
     if (strcmp(cmd.command, "pwd") == 0) {
         char cwd[1024];
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -41,12 +127,15 @@ int handle_builtin(Command cmd) {
         } else {
             perror("pwd failed");
         }
-        return 1;                                                           // handled
+        return 1;
     }
-    
-    return 0;                                                               // not a builtin
+
+    return 0; // not a builtin
 }
 
+// ----------------------
+// External execution
+// ----------------------
 void execute_external(Command cmd) {
     pid_t pid = fork();
 
@@ -75,13 +164,7 @@ void execute_external(Command cmd) {
 
         // 2) OUTPUT REDIRECTION: > or >>
         if (cmd.output_file != NULL) {
-            int flags = O_WRONLY | O_CREAT;
-
-            if (cmd.append) {
-                flags |= O_APPEND;   // >>
-            } else {
-                flags |= O_TRUNC;    // >
-            }
+            int flags = O_WRONLY | O_CREAT | (cmd.append ? O_APPEND : O_TRUNC);
 
             int out_fd = open(cmd.output_file, flags, 0644);
             if (out_fd < 0) {
@@ -114,12 +197,13 @@ void execute_external(Command cmd) {
 
     // PARENT PROCESS
     else {
-        // 3) BACKGROUND EXECUTION: &
         if (cmd.background) {
-            printf("[Background pid %d]\n", pid);
-            return; // do not wait
+            // Track it and DO NOT WAIT
+            add_bg_job(pid, cmd.command);
+            return;
         }
 
+        // Foreground: wait normally
         int status;
         waitpid(pid, &status, 0);
 

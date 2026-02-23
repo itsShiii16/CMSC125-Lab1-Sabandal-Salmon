@@ -9,6 +9,7 @@ int main(void) {
     char line[MAX_LINE];
 
     while (1) {
+        reap_background_jobs();
         // Print shell prompt
         printf("mysh > ");
         fflush(stdout);

@@ -5,5 +5,6 @@
 
 int handle_builtin(Command cmd);
 void execute_external(Command cmd);
+void reap_background_jobs(void);
 
 #endif
