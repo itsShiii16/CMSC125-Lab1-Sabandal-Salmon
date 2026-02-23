@@ -1,7 +1,9 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -Iinclude  # Add -Iinclude to specify the include directory
-SRC = src/main.c src/parser.c
+CFLAGS = -Wall -Wextra -std=c11 -Iinclude
+SRC = src/main.c src/parser.c src/interpreter.c
 TARGET = mysh
+
+.PHONY: all clean
 
 all:
 	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)

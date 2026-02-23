@@ -21,40 +21,61 @@ Command parse_input(char *line) {
     cmd.append = false;
     cmd.background = false;
 
+    // ✅ initialize args to NULL
+    for (int i = 0; i < MAX_ARGS; i++) {
+        cmd.args[i] = NULL;
+    }
+
     char *token = strtok(line, " ");
     int arg_count = 0;
 
     while (token != NULL) {
-        // Check for redirection operators
         if (strcmp(token, "<") == 0) {
             token = strtok(NULL, " ");
+            if (token == NULL) {
+                fprintf(stderr, "syntax error: missing filename after <\n");
+                break;
+            }
             cmd.input_file = token;
         }
         else if (strcmp(token, ">") == 0) {
             token = strtok(NULL, " ");
+            if (token == NULL) {
+                fprintf(stderr, "syntax error: missing filename after >\n");
+                break;
+            }
             cmd.output_file = token;
-            cmd.append = false;  // Default to overwrite
+            cmd.append = false;
         }
         else if (strcmp(token, ">>") == 0) {
             token = strtok(NULL, " ");
+            if (token == NULL) {
+                fprintf(stderr, "syntax error: missing filename after >>\n");
+                break;
+            }
             cmd.output_file = token;
-            cmd.append = true;   // Append mode
+            cmd.append = true;
         }
         else if (strcmp(token, "&") == 0) {
-            cmd.background = true;  // Background process flag
+            cmd.background = true;
         }
         else {
-            // Store the command or arguments
             if (cmd.command == NULL) {
-                cmd.command = token;  // The first token is the command itself
+                cmd.command = token;
             } else {
-                cmd.args[arg_count++] = token;  // Add arguments to the array
+                if (arg_count < MAX_ARGS - 1) {
+                    cmd.args[arg_count++] = token;
+                } else {
+                    fprintf(stderr, "error: too many arguments\n");
+                    break;
+                }
             }
         }
-        token = strtok(NULL, " ");  // Get next token
+
+        token = strtok(NULL, " ");
     }
 
-    cmd.args[arg_count] = NULL;  // Null-terminate the args array
+    cmd.args[arg_count] = NULL;
     return cmd;
 }
 
