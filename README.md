@@ -32,6 +32,14 @@ The shell is written in POSIX-compliant C and follows modular design principles 
 gcc -Wall -Wextra -std=c11 -Iinclude src/main.c src/parser.c src/interpreter.c -o mysh
 ```
 
+ ### Flag Explanation
+
+- `-Wall` enables common compiler warnings
+- `-Wextra` enables additional warnings
+- `-std=c11` enforces C11 standard compliance
+- `-Iinclude` specifies header file directory
+- `-o mysh` outputs the executable file
+
 ---
 
 ## Usage Instructions
@@ -60,7 +68,14 @@ mysh > exit
 ## Implemented Features
 
 ### 1. Command Parsing
-The shell reads user input and tokenizes commands and arguments using a custom parser.
+The shell reads user input and tokenizes commands and arguments using `strtok()`.
+
+#### It identifies:
+- Command name
+- Arguments
+- Input redirection (<)
+- Output redirection (>, >>)
+- Background operator (&)
 
 Example:
 ```bash
@@ -68,8 +83,8 @@ ls -l
 ```
 
 Parsed as:
-- Command: ls
-- Arguments: -l
+- Command: `ls`
+- Arguments: `-l`
 
 
 ### 2. Built-in Commands (Executed in Parent Process)
@@ -106,26 +121,106 @@ mysh > sleep 2
 mysh > echo Testing
 ```
 
+### 4. Background Job Execution (&)
+Commands followed by `&` run in the background.
+
+Example:
+```bash
+mysh > sleep 5 &
+```
+
+Output:
+```bash
+[1] Started background job: sleep (PID: 12345)
+```
+
+The shell does not wait for background processes.
+
+#### Background Job Reaping
+- `waitpid(..., WNOHANG)` is used
+- Prevents zombie processes
+- Completed jobs are automatically detected
+- Completion message is printed:
+
+```bash
+[1] Done: sleep (PID: 12345) exit=0
+```
+
+### 5. Input Redirection (<)
+Redirects input from a file.
+
+Example:
+```bash
+mysh > sort < input.txt
+```
+
+#### Implementation details:
+- `open()` with `O_RDONLY`
+- `dup2()` to redirect to `STDIN_FILENO`
+
+### 6. Output Redirection (> and >>)
+#### Overwrite Mode (>)
+
+Example:
+```bash
+mysh > echo Hello > output.txt
+```
+
+- `Uses O_WRONLY | O_CREAT | O_TRUNC`
+
+#### Append Mode (>>)
+
+Example:
+```bash
+mysh > echo World >> output.txt
+```
+
+- `Uses O_WRONLY | O_CREAT | O_TRUNC`
+
+### 7. Zombie Process Prevention
+The shell regularly calls:
+```bash
+reap_background_jobs();
+```
+
+This uses:
+```bash
+waitpid(-1, &status, WNOHANG);
+```
+
+#### This ensures:
+- No zombie processes remain
+- Background jobs are tracked and cleaned up properly
+
 ---
 
 ## Known Limitations / Bugs
-- Background execution using & is parsed but not yet implemented.
-- Input/output redirection (<, >, >>) is included in the parser structure but not yet functional.
+- No support for pipes (|)
+- No support for command chaining (&&, ||)
+- No advanced job control (fg, bg, jobs)
+- No signal handling customization (Ctrl+C behavior is default)
 
 ---
 
 ## Design Decisions & Architecture Overview
 
-### Core Architecture
-
-The shell follows a modular structure:
-- main.c handles the shell loop and execution logic
-- parser.c handles tokenization and command parsing
-- parser.h defines shared structures and prototypes
-
-This separation ensures that parsing and execution remain independent.
-
----
+### Modular Structure
+The shell follows separation of concerns:
+#### main.c
+- Shell loop
+- Prompt display
+- Calls parser
+- Calls built-in or external execution
+#### parser.c
+- Tokenizes input
+- Identifies redirection and background operators
+- Populates Command struct
+#### interpreter.c
+- Built-in command handling
+- Fork/exec logic
+- Redirection handling
+- Background job tracking
+- Zombie cleanup
 
 ### Command Data Structure
 
@@ -148,19 +243,46 @@ This ensures parsing and execution remain decoupled and maintainable.
 ---
 
 ## Testing Strategy
+Tested using:
+- ls
+- echo
+- sleep
+- cat
+- sort
+- pwd
+- cd
+- exit
+- Redirection tests
+- Background execution tests
 
-The shell was tested using common Unix commands:
-
-- ls, echo, sleep
-- built-ins: pwd, cd, exit
-
-Example test sequence:
+Example full test:
+### Interactive Command Loop
 ```bash
 mysh > pwd
-mysh > cd ..
+mysh > cd /tmp
 mysh > pwd
-mysh > ls
-mysh > exit
+mysh> ls -la
+mysh> echo "Hello, World!"
+mysh> nonexistent_command
+mysh> exit
+```
+
+### I/O Redirection
+```bash
+mysh> ls -la > output.txt
+mysh> cat output.txt
+mysh> wc -l < output.txt
+mysh> echo "appending text" >> output.txt
+mysh> sort < unsorted.txt > sorted.txt
+```
+
+### Background Execution
+```bash
+mysh> sleep 10 &
+mysh> echo "Shell still responsive"
+mysh> sleep 20 &
+mysh> ls -la
+mysh>
 ```
 
 ---
@@ -170,14 +292,45 @@ mysh > exit
 ---
 
 ## Repository Structure
+```bash
+CMSC125-Lab1-Sabandal-Salmon/
+│
+├── .vscode/
+│   └── c_cpp_properties.json        # VSCode C/C++ configuration
+│
+├── include/
+│   ├── interpreter.h                # Interpreter function declarations
+│   └── parser.h                     # Parser structures and prototypes
+│
+├── src/
+│   ├── interpreter.c                # Built-ins, execution, redirection, background jobs
+│   ├── main.c                       # Shell loop and program entry point
+│   └── parser.c                     # Command parsing logic
+│
+├── design.md                        # Design explanation and architecture notes
+├── Makefile                         # Build automation file
+├── mysh                             # Compiled Linux executable
+├── mysh.exe                         # Compiled Windows executable
+└── README.md                        # Project documentation
+```
 
 ---
 
 ## Lessons Learned
+- Proper process management using `fork()` and `execvp()`
+- Importance of handling zombie processes
+- How file descriptors and `dup2()` enable redirection
+- Why built-in commands must run in the parent process
+- Practical understanding of Unix process control
 
 ---
 
 ## Submission Notes
+- POSIX-compliant
+- Compiles using gcc with warnings enabled
+- Background jobs fully implemented
+- Input/output redirection fully implemented
+- Modular and readable structure
 
 ---
 
