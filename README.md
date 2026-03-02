@@ -167,6 +167,18 @@ mysh > exit
 
 ## Screenshots (Functionality Demo)
 
+<img width="1919" height="1146" alt="image" src="https://github.com/user-attachments/assets/a42688e9-acdb-4d73-83ae-c565dfb6d989" />
+
+<img width="1919" height="1139" alt="image" src="https://github.com/user-attachments/assets/66527ff7-29e1-4b82-9145-54f10f029161" />
+
+<img width="1919" height="1142" alt="image" src="https://github.com/user-attachments/assets/b03bf551-69ab-45ff-b921-4deaa17d9ad8" />
+
+<img width="1919" height="1150" alt="image" src="https://github.com/user-attachments/assets/28261295-6439-4b46-b27a-c9b07fff9829" />
+
+<img width="1919" height="1145" alt="image" src="https://github.com/user-attachments/assets/a75de076-d303-4125-8805-90d723a1ad44" />
+
+
+
 ---
 
 ## Repository Structure
@@ -182,3 +194,4 @@ mysh > exit
 ---
 
 # End of README
+
